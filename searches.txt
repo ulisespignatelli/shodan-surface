@@ -10,3 +10,5 @@
   #  net:181.93.238.0/24 org:"EPE"  org:"Empresa Provincial de la Energia"                
    # asn:AS7303                          
    # org:"Empresa Provincial de la Energia"   
+      ssl:"epe.santafe.gov.ar"
+      ssl.cert.subject.cn:"epe.santafe.gov.ar"
