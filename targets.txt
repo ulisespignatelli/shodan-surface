@@ -6,3 +6,4 @@ webmail.epe.santafe.gov.ar
 vpn.epe.santafe.gov.ar
 epe.santafe.gov.ar/scada/
 epe.santafe.gov.ar/app2/
+crt.sh/?q=%25.epe.santafe.gov.ar
