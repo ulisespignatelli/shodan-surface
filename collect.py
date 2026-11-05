@@ -28,7 +28,10 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "site", "data", "surface.json")
 TARGETS = os.path.join(HERE, "targets.txt")
+SEARCHES = os.path.join(HERE, "searches.txt")
 API = "https://api.shodan.io"
+# Cuántas páginas de 100 resultados pedir por búsqueda (cada página = 1 crédito).
+SEARCH_MAX_PAGES = int(os.environ.get("SEARCH_MAX_PAGES", "2"))
 
 OT_PORTS = {
     102: "S7 (Siemens S7comm)", 502: "Modbus", 789: "Red Lion Crimson",
@@ -105,16 +108,83 @@ def normalize(host, label):
     }
 
 
-def read_targets():
-    if not os.path.exists(TARGETS):
+def _read_lines(path):
+    if not os.path.exists(path):
         return []
     out = []
-    with open(TARGETS, encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for ln in f:
             ln = ln.strip()
             if ln and not ln.startswith("#"):
                 out.append(ln)
     return out
+
+
+def read_targets():
+    return _read_lines(TARGETS)
+
+
+def read_searches():
+    return _read_lines(SEARCHES)
+
+
+def shodan_search(query, key, page):
+    url = (f"{API}/shodan/host/search?key={urllib.parse.quote(key)}"
+           f"&query={urllib.parse.quote(query)}&page={page}")
+    req = urllib.request.Request(url, headers={"User-Agent": "shodan-surface"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def search_to_assets(query, key, max_pages):
+    """Ejecuta una búsqueda de Shodan y agrupa los resultados por IP en activos."""
+    hosts = {}
+    for page in range(1, max_pages + 1):
+        j = shodan_search(query, key, page)
+        matches = j.get("matches", [])
+        if not matches:
+            break
+        for m in matches:
+            ip = m.get("ip_str")
+            if not ip:
+                continue
+            loc = m.get("location", {}) or {}
+            h = hosts.setdefault(ip, {
+                "ip_str": ip, "org": m.get("org"), "isp": m.get("isp"), "asn": m.get("asn"),
+                "country_name": loc.get("country_name"), "city": loc.get("city"),
+                "hostnames": set(), "domains": set(), "ports": set(), "vulns": set(),
+                "data": [], "last_update": "",
+            })
+            h["hostnames"].update(m.get("hostnames") or [])
+            h["domains"].update(m.get("domains") or [])
+            if m.get("port") is not None:
+                h["ports"].add(m["port"])
+            mv = m.get("vulns")
+            if isinstance(mv, dict):
+                h["vulns"].update(mv.keys())
+            elif isinstance(mv, list):
+                h["vulns"].update(mv)
+            ts = m.get("timestamp", "") or ""
+            if ts > h["last_update"]:
+                h["last_update"] = ts
+            h["data"].append({
+                "port": m.get("port"), "transport": m.get("transport", "tcp"),
+                "product": m.get("product"), "version": m.get("version"),
+                "_shodan": m.get("_shodan", {}) or {}, "data": m.get("data", ""),
+                "vulns": m.get("vulns"),
+            })
+        if len(matches) < 100:    # última página
+            break
+
+    assets = []
+    for ip, h in hosts.items():
+        h["hostnames"] = sorted(h["hostnames"])
+        h["domains"] = sorted(h["domains"])
+        h["ports"] = sorted(h["ports"])
+        h["vulns"] = sorted(h["vulns"])
+        label = h["hostnames"][0] if h["hostnames"] else ip
+        assets.append(normalize(h, label))
+    return assets
 
 
 DEMO_HOSTS = [
@@ -172,14 +242,21 @@ def main():
         if not key and not args.demo:
             print("[i] Sin SHODAN_API_KEY: generando datos de ejemplo.", file=sys.stderr)
     else:
+        seen = set()
         targets = read_targets()
-        if not targets:
-            print("[!] targets.txt está vacío. Agregá tus dominios/IPs.", file=sys.stderr)
+        searches = read_searches()
+        if not targets and not searches:
+            print("[!] targets.txt y searches.txt están vacíos. Agregá tus activos.", file=sys.stderr)
+
+        # 1) hosts exactos (dominio o IP)
         for t in targets:
             try:
                 ip, host = resolve(t)
+                if ip in seen:
+                    continue
                 raw = shodan_host(ip, key)
                 assets.append(normalize(raw, host or ip))
+                seen.add(ip)
                 print(f"[+] {t} -> {ip}: {len(raw.get('ports', []))} puertos", file=sys.stderr)
             except socket.gaierror:
                 errors.append({"target": t, "error": "no se pudo resolver"})
@@ -188,6 +265,26 @@ def main():
                 errors.append({"target": t, "error": msg})
             except Exception as e:
                 errors.append({"target": t, "error": str(e)})
+
+        # 2) búsquedas (net:, asn:, org:…) — descubren varios hosts de una
+        for q in searches:
+            try:
+                found = search_to_assets(q, key, SEARCH_MAX_PAGES)
+                added = 0
+                for a in found:
+                    if a["ip"] in seen:
+                        continue
+                    seen.add(a["ip"])
+                    assets.append(a)
+                    added += 1
+                print(f"[+] búsqueda '{q}': {added} hosts nuevos", file=sys.stderr)
+            except urllib.error.HTTPError as e:
+                msg = {401: "API key inválida", 429: "rate limit",
+                       403: "tu plan no permite esta búsqueda"}.get(e.code, f"HTTP {e.code}")
+                errors.append({"target": q, "error": msg})
+            except Exception as e:
+                errors.append({"target": q, "error": str(e)})
+
         data = build(assets, errors, demo=False)
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

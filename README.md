@@ -25,8 +25,25 @@ targets.txt  ─▶  collect.py (en GitHub Actions, con tu SHODAN_API_KEY)  ─�
 1. **Subí este repo** a GitHub.
 2. **Agregá tu API key como secret**: Settings → Secrets and variables → **Actions** → *New repository secret* → nombre `SHODAN_API_KEY`, valor tu key de Shodan.
 3. **Activá Pages**: Settings → Pages → Source: **GitHub Actions**.
-4. **Editá `targets.txt`** con tus dominios/IPs (uno por línea).
+4. **Definí qué monitorear** (ver abajo: `targets.txt` y/o `searches.txt`).
 5. Corré el workflow (Actions → *Actualizar superficie* → *Run workflow*) o esperá al cron.
+
+## Qué monitorear
+
+Hay dos formas, y podés combinarlas:
+
+- **`targets.txt`** — hosts exactos, un dominio o IP por línea. Ideal si sabés cuáles querés mirar.
+- **`searches.txt`** — **búsquedas de Shodan**, que descubren **varios hosts de una**. Útil para ver *toda* la superficie de tu organización. Una consulta por línea, por ejemplo:
+
+  ```
+  net:181.93.238.0/24                        un rango de IPs propio (CIDR)
+  asn:AS7303                                 un ASN propio
+  org:"Empresa Provincial de la Energia"     por nombre de organización
+  ```
+
+  Cada página de resultados consume 1 crédito de búsqueda de Shodan; por defecto se piden hasta 2 páginas (200 hosts) por consulta — ajustable con la variable `SEARCH_MAX_PAGES`.
+
+> ⚠️ Usá búsquedas **solo sobre rangos/organizaciones que te pertenezcan o estés autorizado a auditar**. Es la forma de ver la superficie completa de tu propia infraestructura (con sus CVEs y protocolos OT), no de rastrear a terceros.
 
 > Sin el secret, el workflow genera **datos de ejemplo** igual, así ves el panel funcionando desde el primer deploy.
 

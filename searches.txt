@@ -1,0 +1,9 @@
+# Búsquedas de Shodan — una por línea. Descubren varios hosts de una.
+# Usá SOLO filtros de activos que te pertenezcan o estés autorizado a auditar.
+# Ejemplos (reemplazá por lo tuyo):
+#
+#   net:181.93.238.0/24                 un rango de IPs propio (CIDR)
+#   asn:AS7303                          un ASN propio
+#   org:"Empresa Provincial de la Energia"   por nombre de organización
+#
+# (dejá esto vacío/comentado si solo querés usar targets.txt)
