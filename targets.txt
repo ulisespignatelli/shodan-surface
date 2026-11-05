@@ -2,6 +2,4 @@
 # Poné SOLO activos propios o que estés autorizado a auditar.
 # Ejemplos (reemplazá por los tuyos):
 
-net:181.93.238.0/24                 
-asn:AS7303                          
-org:"Empresa Provincial de la Energia"   
+  https://epe.santafe.gov.ar/scada/

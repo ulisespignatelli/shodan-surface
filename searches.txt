@@ -7,3 +7,6 @@
 #   org:"Empresa Provincial de la Energia"   por nombre de organización
 #
 # (dejá esto vacío/comentado si solo querés usar targets.txt)
+    net:181.93.238.0/24                
+    asn:AS7303                          
+    org:"Empresa Provincial de la Energia"   
