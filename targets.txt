@@ -1,5 +1,4 @@
 # Activos a monitorear — uno por línea (dominios o IPs).
 # Poné SOLO activos propios o que estés autorizado a auditar.
 # Ejemplos (reemplazá por los tuyos):
-ejemplo.com
-198.51.100.42
+epe.santafe.gov.ar/scada/
